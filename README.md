@@ -72,8 +72,24 @@ Les images sont téléchargées **par le serveur** et gardées dans `data/covers
 | Fichier d'état corrompu | Il est mis de côté (jamais supprimé) et la dernière sauvegarde valide est chargée. Si rien n'est récupérable, le serveur **refuse de démarrer** plutôt que de créer une bibliothèque vide. |
 | Suppression par erreur | Confirmation, puis sauvegarde automatique prise **avant** la suppression (`data/backups/…-delete.json`). |
 | Sauvegardes | Instantané automatique (au plus toutes les 15 s pendant les modifications, toujours avant un gros rétrécissement, une suppression, un import ou une restauration). Rétention : tout pendant 2 jours, une par heure pendant 2 semaines, une par jour pendant 6 mois, une par mois ensuite. |
-| Mise à jour du conteneur | L'image ne contient aucune donnée utilisateur. |
+| Mise à jour du conteneur | L'image ne contient aucune donnée utilisateur, et ne modifie jamais celles du dossier monté (voir ci-dessous). |
 | Requêtes venant d'un autre site | Les écritures exigent un en-tête personnalisé et une origine identique ; CSP stricte ; le proxy d'images n'accepte que HTTPS et une courte liste d'hébergeurs d'images. |
+
+### Les mises à jour ne modifient jamais tes données
+
+C'est la priorité n°1 du projet. **Mettre à jour (ou redémarrer, ou recréer) le conteneur ne change jamais `state.json`**, pas un octet. Concrètement :
+
+- Au démarrage, l'application **lit** tes données ; elle ne les réécrit pas. Seule une action de ta part (cocher, noter, ajouter…) modifie le fichier, et seulement la partie concernée.
+- Au **premier démarrage après une mise à jour**, une copie exacte de tes données est ajoutée dans `data/backups/` (`…-update.json`). Elle n'est jamais effacée automatiquement.
+- Le **seul** cas où une mise à jour réécrit tes données est une **migration de schéma prévue et annoncée** dans la release. Dans ce cas : copie brute de l'ancien fichier (`…-pre-migration.json`) **avant** toute écriture, migration faite en mémoire sur une copie, résultat validé, puis une seule écriture atomique. Au moindre problème, le fichier reste exactement comme il était et le serveur refuse de démarrer avec un message clair.
+- **Pas de retour en arrière silencieux** : si tes données ont été écrites par une version plus récente que l'image lancée, l'ancienne image **refuse de les ouvrir** sans rien lire, déplacer ni modifier.
+- Un champ inconnu (écrit par une version plus récente) est conservé tel quel quand tu modifies un jeu.
+- Ajouter une fonctionnalité ne migre rien : un champ absent est simplement lu avec sa valeur par défaut.
+- Le seul changement que le démarrage peut faire sur le dossier est de **réparer le propriétaire des fichiers** (utile sur NAS) ; le contenu n'est pas touché.
+
+Ce n'est pas qu'une promesse, c'est testé à chaque release (CI) : des fichiers de données **figés** de chaque version (`test/fixtures/data-v*/`, protégés par une somme de contrôle) doivent s'ouvrir avec le code actuel sans perdre une donnée ; le serveur en marche ne réécrit rien en lecture ; une migration en échec ne laisse aucune trace ; et le test du conteneur lance la **nouvelle image sur les données écrites par la release précédente** et vérifie que `state.json` est identique octet pour octet.
+
+> **Pour les développeurs** : toute modification de ce qui est stocké suit la règle écrite en tête de [`server/migrations.js`](server/migrations.js) (incrémenter `CURRENT_SCHEMA`, écrire la migration, ajouter une fixture gelée). Les tests échouent tant que les trois ne sont pas faits.
 
 **Restaurer une sauvegarde** : conteneur arrêté, copie le fichier voulu de `data/backups/` par-dessus `data/state.json`, puis redémarre.
 
@@ -84,7 +100,8 @@ Les images sont téléchargées **par le serveur** et gardées dans `data/covers
 ```
 data/
   state.json     la bibliothèque (jeux, succès cochés, notes…)
-  backups/       instantanés automatiques  state-<date>-r<rev>[-delete|-import|-shrink|-restore].json
+  backups/       instantanés  state-<date>-r<rev>[-update|-pre-migration|-delete|-import|-shrink|-restore].json
+  .version       dernière version de l'application lancée (pour la copie « update »)
   covers/        jaquettes et images mises en cache
 ```
 

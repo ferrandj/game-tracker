@@ -45,6 +45,26 @@ docker rm -f "$NAME" >/dev/null; run; wait_up
 [ "$(field 'd => d.games[0].review')" = '"précieux"' ] || fail "review lost after recreate"
 [ "$(field 'd => d.games.length')" = "1" ] || fail "library changed after recreate"
 
+if [ -n "${PREV_IMAGE:-}" ]; then
+  echo "== UPDATE: the new image on data written by the previous release ($PREV_IMAGE) leaves state.json byte-for-byte identical"
+  docker rm -f "$NAME" >/dev/null
+  UPD="$(mktemp -d)"; chmod 777 "$UPD"
+  docker run -d --name "$NAME" -p 18088:8080 -v "$UPD:/data" "$PREV_IMAGE" >/dev/null; wait_up
+  UID1=$(api -X POST http://127.0.0.1:18088/api/games -d '{"title":"Written by the old release","platform":"switch","fetchAchievements":false}' | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(JSON.parse(s).game.id))')
+  api -X PATCH "http://127.0.0.1:18088/api/games/$UID1" -d '{"rating":7,"review":"avant la mise à jour"}' >/dev/null
+  api -X POST "http://127.0.0.1:18088/api/games/$UID1/achievements" -d '{"text":"Un\nDeux\nTrois"}' >/dev/null
+  docker rm -f "$NAME" >/dev/null
+  BEFORE=$(sha256sum "$UPD/state.json" | cut -d' ' -f1)
+  docker run -d --name "$NAME" -p 18088:8080 -v "$UPD:/data" "$IMG" >/dev/null; wait_up
+  [ "$(field 'd => d.games[0].review')" = '"avant la mise à jour"' ] || fail "data written by the previous release is not readable"
+  [ "$(field 'd => d.games[0].achievements.length')" = "3" ] || fail "achievements lost by the update"
+  docker rm -f "$NAME" >/dev/null
+  [ "$(sha256sum "$UPD/state.json" | cut -d' ' -f1)" = "$BEFORE" ] || fail "THE UPDATE MODIFIED THE DATA (state.json is not identical)"
+  ls "$UPD/backups" | grep -q -- '-update.json' || fail "no raw copy of the data was kept at the first start after the update"
+  sudo rm -rf "$UPD" 2>/dev/null || rm -rf "$UPD"
+  run; wait_up
+fi
+
 echo "== a corrupt state file is moved aside and recovered from a backup"
 docker rm -f "$NAME" >/dev/null
 ls "$DATA/backups" | grep -q . || fail "no automatic backup was made"

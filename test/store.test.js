@@ -67,7 +67,7 @@ test('corrupt state.json is kept aside and the newest backup is loaded', () => {
 test('refuses to start empty when data existed but nothing can be recovered', () => {
   const dir = tmpDir();
   new Store(dir, { snapshotEveryMs: 0 }).init();
-  fs.rmSync(path.join(dir, 'backups'), { recursive: true });
+  fs.rmSync(path.join(dir, 'backups'), { recursive: true, force: true });
   fs.writeFileSync(path.join(dir, 'state.json'), 'garbage');
   assert.throws(() => new Store(dir).init(), /Refusing to start/);
   assert.ok(fs.existsSync(path.join(dir, 'state.json')) === false, 'the bad file was moved, not deleted');

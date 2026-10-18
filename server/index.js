@@ -334,7 +334,7 @@ function main() {
     throw new Error(dataDir + ' is not writable by this user (uid ' + process.getuid() + '; the folder has ' + describeFolder(dataDir) + '). Fix the folder permissions or run the container with `user: "UID:GID"` of the folder owner.');
   }
   const every = process.env.SNAPSHOT_INTERVAL_SEC === undefined ? undefined : Math.max(0, parseFloat(process.env.SNAPSHOT_INTERVAL_SEC)) * 1000;
-  const store = new Store(dataDir, { snapshotEveryMs: every }).init();
+  const store = new Store(dataDir, { snapshotEveryMs: every, appVersion: process.env.APP_VERSION }).init();
   const providers = createProviders(process.env);
   const catalog = createCatalog(providers);
   const extraImageHosts = String(process.env.IMAGE_ALLOW_PREFIXES || '').split(',').map(function (x) { return x.trim(); }).filter(Boolean);
