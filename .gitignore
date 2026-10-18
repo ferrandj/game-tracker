@@ -1,0 +1,9 @@
+# Runtime data and anything personal must never be committed.
+/data/
+/private/
+*.local.json
+.env
+.env.*
+node_modules/
+*.log
+.DS_Store

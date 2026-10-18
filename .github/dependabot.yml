@@ -1,0 +1,22 @@
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    ignore:
+      # Odd Node.js majors are short-lived "current" releases; stay on LTS (even) majors.
+      - dependency-name: node
+        versions: ["25.x", "27.x", "29.x"]
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: weekly
+    groups:
+      # one PR per week for the minor/patch bumps of the web app; majors stay separate for review
+      web-minor-and-patch:
+        update-types: [minor, patch]

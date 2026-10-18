@@ -1,0 +1,50 @@
+# Game Tracker: ready to deploy. Works with NO secret at all (Steam search + Steam achievements need no key);
+# the optional keys below add more databases and PlayStation trophies.
+#
+# Synology (Container Manager): create the folder /volume1/docker/game-tracker/data first, then
+# Container Manager -> Project -> Create -> paste this file (or use "docker compose up -d" over SSH).
+#
+# From then on the data folder is the only source of truth: updating or re-creating the container never touches it.
+services:
+  game-tracker:
+    # The image is built and published by GitHub: there is NOTHING to build on the NAS (no "build:" line on purpose,
+    # it would make Compose look for a Dockerfile in this folder instead of pulling the image).
+    image: ghcr.io/ferrandj/game-tracker:latest
+    # :latest = newest release, :1 = only 1.x releases, :1.1.0 = pinned to one release.
+    # To update: docker compose pull && docker compose up -d   (or let Watchtower do it, see the label below)
+    container_name: game-tracker
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      # <port on the NAS>:<port in the container, keep 8080>  ->  http://<nas-address>:10458
+      - "10458:8080"
+    volumes:
+      # EVERYTHING you create lives in this folder: library (state.json), cached covers, automatic backups (backups/).
+      # Include it in your NAS backup (Hyper Backup, rsync, ...).
+      - /volume1/docker/game-tracker/data:/data
+    labels:
+      # Lets Watchtower (if you run it) update this container automatically when a new release is published.
+      - com.centurylinklabs.watchtower.enable=true
+
+    # --- Optional: more data sources (uncomment what you use; see the README for where to get each value) -------------
+    # environment:
+    #   # More / better covers and a bigger catalogue. Free: create an application on https://dev.twitch.tv/console
+    #   IGDB_CLIENT_ID: "<twitch-client-id>"
+    #   IGDB_CLIENT_SECRET: "<twitch-client-secret>"
+    #   # Another big catalogue. Free key: https://rawg.io/apidocs
+    #   RAWG_KEY: "<rawg-key>"
+    #   # Cleaner Steam achievements (hidden flag, official names). Without it the public Steam page is read.
+    #   STEAM_API_KEY: "<steam-web-api-key>"
+    #   # PlayStation trophies, read from YOUR account (valid about 2 months, see the README).
+    #   PSN_NPSSO: "<64-characters-npsso>"
+    #
+    #   # Optional password for the whole app (otherwise protect it with your reverse proxy / VPN):
+    #   AUTH_USER: "<choose-a-user>"
+    #   AUTH_PASSWORD: "<choose-a-password>"
+
+    # --- Only if needed -------------------------------------------------------------------------
+    # Permissions need no setup: the container runs as whoever owns the data folder (and hands a folder that
+    # Docker created as root to an unprivileged user). Set "user:" only to force one on purpose; then that user
+    # must be able to write to the folder.
+    # user: "UID:GID"

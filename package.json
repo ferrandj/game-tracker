@@ -1,0 +1,12 @@
+{
+  "name": "game-tracker",
+  "version": "1.0.0",
+  "description": "Self-hosted tracker for your video games: library, trophies / achievements, ratings (no runtime dependencies).",
+  "private": true,
+  "license": "MIT",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node server/index.js",
+    "test": "node --test test/*.test.js"
+  }
+}
